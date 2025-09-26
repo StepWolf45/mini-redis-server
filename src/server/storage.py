@@ -4,6 +4,7 @@
 import asyncio
 import time
 from typing import Any, Dict, Optional, Tuple
+import fnmatch
 from dataclasses import dataclass
 import threading
 
@@ -222,11 +223,8 @@ class Storage:
             return result
     
     def _match_pattern(self, key: str, pattern: str) -> bool:
-        """ Сопостовление паттернов."""
-        if pattern == "*":
-            return True
-
-        return key == pattern
+        """Сопоставление паттернов по правилам glob (*, ?, [seq])."""
+        return fnmatch.fnmatchcase(key, pattern)
     
     def size(self) -> int:
         """Возвращает количество активных ключей."""
