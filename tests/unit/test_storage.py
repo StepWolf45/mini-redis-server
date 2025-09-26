@@ -29,7 +29,6 @@ def test_set_with_ttl_and_expire_automatically():
             found, value = storage.get("temp")
             assert found is True and value == "v"
 
-            # ждём истечения TTL и фоновой очистки
             await asyncio.sleep(0.35)
 
             found, value = storage.get("temp")
@@ -46,7 +45,7 @@ def test_expire_existing_key():
     assert storage.expire("k", 0.1) is True
     assert storage.ttl("k") >= 0
     time.sleep(0.15)
-    # Обращение очистит при чтении
+
     found, _ = storage.get("k")
     assert found is False
 
@@ -90,5 +89,86 @@ def test_keys_and_size_with_expired_entries():
     keys_after = storage.keys("*")
     assert "k2" not in keys_after
     assert size_before == len(keys_after)
+
+
+def test_heap_based_cleanup_efficiency():
+    """Тест, что heap позволяет эффективно удалять только истекшие ключи."""
+    storage = Storage()
+
+    async def scenario():
+        await storage.start_cleanup_task()
+        try:
+            # Устанавливаем ключи с разными TTL
+            storage.set("short", "v1", ttl=0.1)
+            storage.set("medium", "v2", ttl=0.3)
+            storage.set("long", "v3", ttl=1.0)
+            storage.set("permanent", "v4")  # без TTL
+
+            # Проверяем, что все ключи существуют
+            assert storage.exists("short") is True
+            assert storage.exists("medium") is True
+            assert storage.exists("long") is True
+            assert storage.exists("permanent") is True
+
+            # Ждем истечения short
+            await asyncio.sleep(0.15)
+
+            # short должен быть удален, остальные нет
+            assert storage.exists("short") is False
+            assert storage.exists("medium") is True
+            assert storage.exists("long") is True
+            assert storage.exists("permanent") is True
+
+            # Ждем истечения medium
+            await asyncio.sleep(0.2)
+
+            assert storage.exists("medium") is False
+            assert storage.exists("long") is True
+            assert storage.exists("permanent") is True
+
+        finally:
+            await storage.stop_cleanup_task()
+
+    asyncio.run(scenario())
+
+
+def test_ttl_update_in_heap():
+    """Тест, что обновление TTL правильно обновляет heap."""
+    storage = Storage()
+
+    async def scenario():
+        await storage.start_cleanup_task()
+        try:
+            # Устанавливаем ключ с коротким TTL
+            storage.set("key", "value", ttl=0.1)
+
+            # Обновляем TTL на более длинный
+            assert storage.expire("key", 1.0) is True
+
+            # Ждем больше чем первоначальный TTL
+            await asyncio.sleep(0.2)
+
+            # Ключ все еще должен существовать
+            assert storage.exists("key") is True
+
+        finally:
+            await storage.stop_cleanup_task()
+
+    asyncio.run(scenario())
+
+
+def test_clear_resets_heap():
+    """Тест, что clear очищает и данные, и heap."""
+    storage = Storage()
+    storage.set("k1", "v1", ttl=1.0)
+    storage.set("k2", "v2")
+
+    # Проверяем, что heap не пуст
+    assert len(storage._expire_heap) > 0
+
+    storage.clear()
+
+    assert len(storage._data) == 0
+    assert len(storage._expire_heap) == 0
 
 
