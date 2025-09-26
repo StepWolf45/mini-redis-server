@@ -2,6 +2,7 @@
 Система хранения данных c поддержкой TTL.
 """
 import asyncio
+import heapq
 import time
 from typing import Any, Dict, Optional, Tuple
 import fnmatch
@@ -33,6 +34,7 @@ class Storage:
         self._lock = threading.RLock()
         self._cleanup_task: Optional[asyncio.Task] = None
         self._cleanup_interval = 1.0 #сек
+        self._expire_heap = []  
     
     async def start_cleanup_task(self):
         """Запускает фоновую задачу очистки истекших элементов."""
@@ -60,24 +62,23 @@ class Storage:
                 print(f"Ошибка в cleanup task: {e}")
     
     async def _cleanup_expired_items(self):
-        """Удаляет все истекшие элементы."""
+        """Удаляет истекшие элементы используя heap."""
         with self._lock:
-            expired_keys = [
-                key for key, item in self._data.items() 
-                if item.is_expired()
-            ]
-            for key in expired_keys:
-                del self._data[key]
+            current_time = time.time()
+            while self._expire_heap and self._expire_heap[0][0] <= current_time:
+                expire_at, key = heapq.heappop(self._expire_heap)
+                if key in self._data and self._data[key].expire_at == expire_at:
+                    del self._data[key]
     
     def set(self, key: str, value: Any, ttl: Optional[float] = None) -> bool:
         """
         Устанавливает значение для ключа.
-        
+
         Args:
             key: Ключ
             value: Значение
             ttl: Время жизни в секундах (None для бессрочного хранения)
-            
+
         Returns:
             True если операция успешна
         """
@@ -85,7 +86,8 @@ class Storage:
             expire_at = None
             if ttl is not None and ttl > 0:
                 expire_at = time.time() + ttl
-            
+                heapq.heappush(self._expire_heap, (expire_at, key))
+
             self._data[key] = StorageItem(value=value, expire_at=expire_at)
             return True
     
@@ -175,24 +177,25 @@ class Storage:
     def expire(self, key: str, ttl: float) -> bool:
         """
         Устанавливает TTL для существующего ключа.
-        
+
         Args:
             key: Ключ
             ttl: Время жизни в секундах
-            
+
         Returns:
             True если TTL установлен, False если ключ не существует
         """
         with self._lock:
             if key not in self._data:
                 return False
-            
+
             item = self._data[key]
             if item.is_expired():
                 del self._data[key]
                 return False
-            
+
             item.expire_at = time.time() + ttl
+            heapq.heappush(self._expire_heap, (item.expire_at, key))
             return True
     
     def keys(self, pattern: str = "*") -> list:
@@ -242,3 +245,4 @@ class Storage:
         """Очищает все данные."""
         with self._lock:
             self._data.clear()
+            self._expire_heap.clear()
