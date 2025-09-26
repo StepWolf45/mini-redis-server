@@ -4,6 +4,9 @@
 import asyncio
 import logging
 from typing import Optional
+from .command_parser import CommandParser
+from .command_handler import CommandHandler
+from .storage import Storage
 
 
 class TCPServer:
@@ -12,6 +15,10 @@ class TCPServer:
         self.port = port
         self._server: Optional[asyncio.base_events.Server] = None
         self._logger = logging.getLogger(__name__)
+
+        self._storage = Storage()
+        self._handler = CommandHandler(self._storage)
+        self._parser = CommandParser()
 
     async def start(self):
         """Запускает TCP сервер и начинает приём клиентских соединений."""
@@ -49,7 +56,18 @@ class TCPServer:
                 line = data.decode('utf-8').strip()
                 if not line:
                     continue
-                writer.write(b"+OK\r\n")
+                parts = self._parser.parse_command(line)
+                if not parts:
+                    continue
+                name = parts[0]
+                args = parts[1:]
+
+                ok, result = self._handler.handle(name, args)
+                if ok:
+                    resp = self._parser.format_response(result)
+                else:
+                    resp = self._parser.format_error(result)
+                writer.write(resp.encode('utf-8'))
                 await writer.drain()
         except asyncio.CancelledError:
             pass
