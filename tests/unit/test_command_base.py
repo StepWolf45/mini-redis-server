@@ -1,4 +1,4 @@
-from src.server.commands.command_base import Command
+from src.server.commands.base_abstraction import Command
 
 
 class Dummy(Command):

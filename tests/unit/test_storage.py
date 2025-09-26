@@ -85,7 +85,7 @@ def test_keys_and_size_with_expired_entries():
     assert set(keys) >= {"k1", "k2", "other"}
 
     time.sleep(0.15)
-    # доступ к size/keys должен очистить истёкшие элементы
+
     size_before = storage.size()
     keys_after = storage.keys("*")
     assert "k2" not in keys_after

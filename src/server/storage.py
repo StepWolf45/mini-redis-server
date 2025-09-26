@@ -1,5 +1,5 @@
 """
-Система хранения данных с поддержкой TTL.
+Система хранения данных c поддержкой TTL.
 """
 import asyncio
 import time
@@ -10,7 +10,7 @@ import threading
 
 @dataclass
 class StorageItem:
-    """Элемент хранения с TTL."""
+    """Элемент хранения c TTL."""
     value: Any
     expire_at: Optional[float] = None 
     
@@ -23,7 +23,7 @@ class StorageItem:
 
 class Storage:
     """
-    Основное хранилище данных с поддержкой TTL.
+    Основное хранилище данных c поддержкой TTL.
     Потокобезопасное хранилище в памяти.
     """
     
@@ -31,7 +31,7 @@ class Storage:
         self._data: Dict[str, StorageItem] = {}
         self._lock = threading.RLock()
         self._cleanup_task: Optional[asyncio.Task] = None
-        self._cleanup_interval = 1.0 
+        self._cleanup_interval = 1.0 #сек
     
     async def start_cleanup_task(self):
         """Запускает фоновую задачу очистки истекших элементов."""
@@ -222,7 +222,7 @@ class Storage:
             return result
     
     def _match_pattern(self, key: str, pattern: str) -> bool:
-        """Простое сопоставление паттернов."""
+        """ Сопостовление паттернов."""
         if pattern == "*":
             return True
 

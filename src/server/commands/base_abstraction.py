@@ -1,25 +1,26 @@
 """
 Базовые интерфейсы и утилиты для команд.
+Позволяет серверу работать c командами полиморфно.
 """
 from abc import ABC, abstractmethod
 from typing import Any, List, Tuple
 
 
 class Command(ABC):
-    """Абстрактная команда Redis‑подобного сервера."""
+    """Абстрактная команда Redis-подобного севера."""
 
     @abstractmethod
     def execute(self, args: List[str]) -> Tuple[bool, Any]:
         """
-        Выполняет команду с аргументами.
+        Выполняет команду c аргументами.
 
-        Возвращает (успех, результат|сообщение об ошибке)
+        Возвращает (успех, результат||сообщение об ошибке)
         """
         raise NotImplementedError
 
     @abstractmethod
     def get_name(self) -> str:
-        """Имя команды (например, "SET")."""
+        """Имя команды"""
         raise NotImplementedError
 
     @staticmethod
