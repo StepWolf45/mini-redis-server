@@ -2,9 +2,10 @@
 Команды для работы с TTL.
 """
 from typing import List, Any, Tuple
-from .base_abstraction import Command
+from .base_abstraction import Command, register_command
 
 
+@register_command("TTL")
 class TtlCommand(Command):
     """Команда TTL для получения времени жизни ключа."""
     
@@ -36,6 +37,7 @@ class TtlCommand(Command):
         return "TTL"
 
 
+@register_command("EXPIRE")
 class ExpireCommand(Command):
     """Команда EXPIRE для установки времени жизни ключа."""
     
@@ -74,6 +76,7 @@ class ExpireCommand(Command):
         return "EXPIRE"
 
 
+@register_command("EXISTS")
 class ExistsCommand(Command):
     """Команда EXISTS для проверки существования ключа."""
     
@@ -107,6 +110,7 @@ class ExistsCommand(Command):
         return "EXISTS"
 
 
+@register_command("DEL")
 class DelCommand(Command):
     """Команда DEL для удаления ключей."""
     
@@ -140,6 +144,7 @@ class DelCommand(Command):
         return "DEL"
 
 
+@register_command("KEYS")
 class KeysCommand(Command):
     """Команда KEYS для получения списка ключей."""
     

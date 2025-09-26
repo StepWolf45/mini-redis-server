@@ -4,16 +4,19 @@
 from typing import Dict, List, Tuple, Any
 
 from .storage import Storage
-from .commands.base_abstraction import Command
-from .commands.get import GetCommand
-from .commands.set import SetCommand
-from .commands.ttl import (
-    TtlCommand,
-    ExpireCommand,
-    ExistsCommand,
-    DelCommand,
-    KeysCommand,
-)
+from .commands.base_abstraction import Command, get_registered_commands
+# Импорт модулей команд для регистрации
+
+
+class CommandFactory:
+    """Фабрика для создания экземпляров команд с зависимостями."""
+
+    def __init__(self, storage: Storage):
+        self.storage = storage
+
+    def create_command(self, command_cls: type[Command]) -> Command:
+        """Создает экземпляр команды с необходимыми зависимостями."""
+        return command_cls(self.storage)
 
 
 class CommandHandler:
@@ -22,17 +25,14 @@ class CommandHandler:
     def __init__(self, storage: Storage):
         self._storage = storage
         self._commands: Dict[str, Command] = {}
+        self._factory = CommandFactory(storage)
         self._register_defaults()
 
     def _register_defaults(self) -> None:
+        registry = get_registered_commands()
         self._commands = {
-            "GET": GetCommand(self._storage),
-            "SET": SetCommand(self._storage),
-            "TTL": TtlCommand(self._storage),
-            "EXPIRE": ExpireCommand(self._storage),
-            "EXISTS": ExistsCommand(self._storage),
-            "DEL": DelCommand(self._storage),
-            "KEYS": KeysCommand(self._storage),
+            name: self._factory.create_command(command_cls)
+            for name, command_cls in registry.items()
         }
 
     def handle(self, command_name: str, args: List[str]) -> Tuple[bool, Any]:

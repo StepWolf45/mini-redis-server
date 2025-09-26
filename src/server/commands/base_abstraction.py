@@ -3,7 +3,7 @@
 Позволяет серверу работать c командами полиморфно.
 """
 from abc import ABC, abstractmethod
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Dict, Type
 
 
 class Command(ABC):
@@ -34,4 +34,19 @@ class Command(ABC):
             return False
         return True
 
+
+_command_registry: Dict[str, Type[Command]] = {}
+
+
+def register_command(name: str):
+    """Декоратор для автоматической регистрации команд."""
+    def decorator(cls: Type[Command]) -> Type[Command]:
+        _command_registry[name.upper()] = cls
+        return cls
+    return decorator
+
+
+def get_registered_commands() -> Dict[str, Type[Command]]:
+    """Возвращает реестр зарегистрированных команд."""
+    return _command_registry.copy()
 

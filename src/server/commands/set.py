@@ -1,7 +1,8 @@
 from typing import List, Any, Tuple
-from .base_abstraction import Command
+from .base_abstraction import Command, register_command
 
 
+@register_command("SET")
 class SetCommand(Command):
     """Команда SET для установки значения по ключу."""
     
