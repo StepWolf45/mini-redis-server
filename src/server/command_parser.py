@@ -1,7 +1,8 @@
 """
 Парсер команд Redis-подобного протокола.
 """
-from typing import Any, List
+import shlex
+from typing import Any, List, Union
 
 
 class CommandParser:
@@ -10,12 +11,21 @@ class CommandParser:
     @staticmethod
     def parse_command(data: str) -> List[str]:
         """
-        Парсит команду из строки: разделение по пробелам, обрезка краёв.
+        Парсит команду из строки с поддержкой кавычек и экранирования.
 
-        Пример: "SET key value" -> ["SET", "key", "value"]
+        Примеры:
+        - "SET key value" -> ["SET", "key", "value"]
+        - 'SET key "hello world"' -> ["SET", "key", "hello world"]
+        - "SET key 'quoted value'" -> ["SET", "key", "quoted value"]
         """
-        parts = data.strip().split()
-        return parts if parts else []
+        data = data.strip()
+        if not data:
+            return []
+
+        try:
+            return shlex.split(data)
+        except ValueError:
+            return data.split()
 
     @staticmethod
     def format_response(value: Any) -> str:
