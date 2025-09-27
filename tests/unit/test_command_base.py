@@ -10,6 +10,7 @@ class Dummy(Command):
 
 
 def test_validate_args_bounds():
+    """Тест валидации количества аргументов в методе validate_args."""
     assert Command.validate_args(["a"], 1, 2) is True
     assert Command.validate_args(["a", "b"], 1, 2) is True
     assert Command.validate_args([], 1, 2) is False

@@ -46,22 +46,32 @@ def test_set_command_validation():
     """Тест валидации аргументов SET."""
     storage = Storage()
     cmd = SetCommand(storage)
-    
+
     # Недостаточно аргументов
     success, result = cmd.execute(["key"])
     assert success is False
     assert "wrong number of arguments" in result
-    
+
     # Неверный EX
     success, result = cmd.execute(["key", "value", "EX", "invalid"])
     assert success is False
     assert "value is not an integer" in result
-    
-    # Отрицательный TTL
+
+    # Неверный PX
+    success, result = cmd.execute(["key", "value", "PX", "invalid"])
+    assert success is False
+    assert "value is not an integer" in result
+
+    # Отрицательный TTL EX
     success, result = cmd.execute(["key", "value", "EX", "-1"])
     assert success is False
     assert "invalid expire time" in result
-    
+
+    # Отрицательный TTL PX
+    success, result = cmd.execute(["key", "value", "PX", "-1"])
+    assert success is False
+    assert "invalid expire time" in result
+
     # Неизвестный аргумент
     success, result = cmd.execute(["key", "value", "UNKNOWN", "1"])
     assert success is False
@@ -106,21 +116,35 @@ def test_commands_with_shared_storage():
     storage = Storage()
     set_cmd = SetCommand(storage)
     get_cmd = GetCommand(storage)
-    
+
     # Устанавливаем значение
     success, result = set_cmd.execute(["test", "hello"])
     assert success is True
-    
+
     # Получаем значение
     success, result = get_cmd.execute(["test"])
     assert success is True
     assert result == "hello"
-    
+
     # Перезаписываем значение
     success, result = set_cmd.execute(["test", "world"])
     assert success is True
-    
+
     # Проверяем новое значение
     success, result = get_cmd.execute(["test"])
     assert success is True
     assert result == "world"
+
+
+def test_set_command_storage_failure():
+    """Тест обработки ошибки в хранилище при выполнении SET."""
+    class FailingStorage:
+        def set(self, key, value, ttl=None):
+            return False
+
+    storage = FailingStorage()
+    cmd = SetCommand(storage)
+
+    success, result = cmd.execute(["key", "value"])
+    assert success is False
+    assert result == "ERR: failed to set value"
