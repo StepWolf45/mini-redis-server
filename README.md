@@ -96,7 +96,8 @@ python example_client.py
 ## Документация
 
 - [Описание команд](docs/commands.md)
-- [Расширяемость решения](docs/extensibility.md)
-- [Альтернативы и выбор решения](docs/alternatives.md)
+- [Расширяемость решения](docs/extensibility.txt)
+- [Альтернативы и выбор решения](docs/alternatives.txt)
 - [Тест-кейсы](tests/test_cases.md)
+
 
