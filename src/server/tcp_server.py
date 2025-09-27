@@ -13,6 +13,7 @@ class TCPServer:
     MAX_ARRAY_SIZE = 1000
     MAX_BULK_STRING_SIZE = 1024 * 1024  # 1MB
     MAX_COMMAND_SIZE = 10 * 1024 * 1024  # 10MB
+    READ_TIMEOUT = 30.0  
 
     def __init__(self, host: str = "127.0.0.1", port: int = 0):
         self.host = host
@@ -31,7 +32,7 @@ class TCPServer:
             await self._storage.start_cleanup_task()
         except Exception:
             pass
-        self._server = await asyncio.start_server(self._handle_client, self.host, self.port)
+        self._server = await asyncio.start_server(self._handle_client, self.host, self.port, reuse_address=True)
         sock = self._server.sockets[0] if self._server and self._server.sockets else None
         if sock is not None:
             self.port = sock.getsockname()[1]
@@ -54,7 +55,7 @@ class TCPServer:
     async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         """
         Обрабатывает подключение клиента: читает строку за строкой и отправляет ответ.
-        
+
         Args:
             reader: поток чтения для клиента
             writer: поток записи для клиента
@@ -96,7 +97,7 @@ class TCPServer:
         При протокольной ошибке возвращает ["-ERR", message].
         """
         try:
-            first = await asyncio.wait_for(reader.readline(), timeout=3.0)
+            first = await asyncio.wait_for(reader.readline(), timeout=self.READ_TIMEOUT)
         except asyncio.TimeoutError:
             return ["-ERR", "Protocol error: read timeout"]
         if not first:
@@ -115,7 +116,7 @@ class TCPServer:
             items: List[str] = []
             for _ in range(count):
                 try:
-                    header = await asyncio.wait_for(reader.readline(), timeout=3.0)
+                    header = await asyncio.wait_for(reader.readline(), timeout=self.READ_TIMEOUT)
                 except asyncio.TimeoutError:
                     return ["-ERR", "Protocol error: read timeout"]
                 if not header or not header.startswith(b"$"):
@@ -130,7 +131,7 @@ class TCPServer:
                     items.append("")
                     continue
                 try:
-                    data = await asyncio.wait_for(reader.readexactly(length + 2), timeout=3.0)
+                    data = await asyncio.wait_for(reader.readexactly(length + 2), timeout=self.READ_TIMEOUT)
                 except asyncio.IncompleteReadError:
                     return ["-ERR", "Protocol error: unexpected EOF"]
                 except asyncio.TimeoutError:
@@ -149,5 +150,6 @@ class TCPServer:
             # inline команда
             line = first.decode('utf-8', errors='replace').strip()
             return self._parser.parse_command(line)
+
 
 
