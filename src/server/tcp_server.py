@@ -10,6 +10,10 @@ from .storage import Storage
 
 
 class TCPServer:
+    MAX_ARRAY_SIZE = 1000
+    MAX_BULK_STRING_SIZE = 1024 * 1024  # 1MB
+    MAX_COMMAND_SIZE = 10 * 1024 * 1024  # 10MB
+
     def __init__(self, host: str = "127.0.0.1", port: int = 0):
         self.host = host
         self.port = port
@@ -97,10 +101,15 @@ class TCPServer:
             return ["-ERR", "Protocol error: read timeout"]
         if not first:
             return None
+
+        if len(first) > self.MAX_COMMAND_SIZE:
+            return ["-ERR", "Protocol error: command too large"]
         if first.startswith(b"*"):
             # RESP массив
             try:
                 count = int(first[1:].strip())
+                if count < 0 or count > self.MAX_ARRAY_SIZE:
+                    return ["-ERR", "Protocol error: invalid array length"]
             except ValueError:
                 return ["-ERR", "Protocol error: invalid array length"]
             items: List[str] = []
@@ -113,6 +122,8 @@ class TCPServer:
                     return ["-ERR", "Protocol error: expected bulk string"]
                 try:
                     length = int(header[1:].strip())
+                    if length < -1 or length > self.MAX_BULK_STRING_SIZE:
+                        return ["-ERR", "Protocol error: invalid bulk length"]
                 except ValueError:
                     return ["-ERR", "Protocol error: invalid bulk length"]
                 if length < 0:
@@ -128,6 +139,12 @@ class TCPServer:
                     return ["-ERR", "Protocol error: bulk not terminated"]
                 items.append(data[:-2].decode('utf-8', errors='replace'))
             return items
+        elif first.startswith(b"+"):
+            return ["-ERR", "Protocol error: unexpected simple string"]
+        elif first.startswith(b":"):
+            return ["-ERR", "Protocol error: unexpected integer"]
+        elif first.startswith(b"-"):
+            return ["-ERR", "Protocol error: unexpected error"]
         else:
             # inline команда
             line = first.decode('utf-8', errors='replace').strip()
