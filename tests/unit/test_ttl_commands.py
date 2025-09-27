@@ -6,23 +6,32 @@ def test_ttl_command():
     """Тест команды TTL."""
     storage = Storage()
     cmd = TtlCommand(storage)
-    
+
     # Несуществующий ключ
     success, result = cmd.execute(["nonexistent"])
     assert success is True
     assert result == -2
-    
+
     # Бессрочный ключ
     storage.set("permanent", "value")
     success, result = cmd.execute(["permanent"])
     assert success is True
     assert result == -1
-    
+
     # Ключ с TTL
     storage.set("temp", "value", ttl=1.0)
     success, result = cmd.execute(["temp"])
     assert success is True
     assert 0 <= result <= 1
+
+    # Неверное число аргументов
+    success, result = cmd.execute([])
+    assert success is False
+    assert "wrong number of arguments" in result
+
+    success, result = cmd.execute(["key1", "extra"])
+    assert success is False
+    assert "wrong number of arguments" in result
 
 
 def test_expire_command():
@@ -54,6 +63,11 @@ def test_expire_command():
     success, result = cmd.execute(["key", "invalid"])
     assert success is False
     assert "value is not an integer" in result
+
+    # Отрицательное время
+    success, result = cmd.execute(["key", "-1"])
+    assert success is False
+    assert "invalid expire time" in result
 
 
 def test_exists_command():
@@ -132,6 +146,39 @@ def test_keys_command():
     success, result = cmd.execute([])
     assert success is False
     assert "wrong number of arguments" in result
+
+
+def test_keys_command_glob_patterns():
+    """Проверка KEYS с glob-шаблонами (*, ?, [seq])."""
+    storage = Storage()
+    cmd = KeysCommand(storage)
+
+    # Данные
+    storage.set("user:1", "alice")
+    storage.set("user:2", "bob")
+    storage.set("user:10", "charlie")
+    storage.set("session:abc", "s1")
+    storage.set("session:def", "s2")
+
+    # Префиксная маска *
+    success, keys = cmd.execute(["user:*"])
+    assert success is True
+    assert set(keys) == {"user:1", "user:2", "user:10"}
+
+    # Один символ ?
+    success, keys = cmd.execute(["user:?"])
+    assert success is True
+    assert set(keys) == {"user:1", "user:2"}
+
+    # Набор символов [12]
+    success, keys = cmd.execute(["user:[12]"])
+    assert success is True
+    assert set(keys) == {"user:1", "user:2"}
+
+    # Смешанные шаблоны
+    success, keys = cmd.execute(["session:*"])
+    assert success is True
+    assert set(keys) == {"session:abc", "session:def"}
 
 
 def test_ttl_workflow():
