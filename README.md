@@ -57,7 +57,7 @@ telnet localhost 6379
 SET hello world
 GET hello
 ```
-
+> Если при подлючение через telnet не получается ввести команду в консоли, попробуйте ввести любое значчение и нажать Enter.
 ### Через Redis CLI (если установлен)
 ```bash
 redis-cli -p 6379
