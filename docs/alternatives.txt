@@ -1,0 +1,79 @@
+Альтернативы реализации и выбор решения
+Архитектура сервера
+Выбран: Asyncio TCP сервер
+
+class TCPServer:
+    async def start(self):
+        server = await asyncio.start_server(self._handle_client, host, port)
+
+Почему выбран:
+    Высокая производительность для I/O-bound операций
+    Поддержка тысяч одновременных подключений
+    Современный подход с использованием asyncio
+Отклоненные альтернативы:
+    Многопроцессный сервер: высокие накладные расходы, сложность синхронизации
+    Многопоточный сервер: ограничения GIL, сложность отладки.
+
+Система хранения
+Выбран: In-memory dict с TTL
+
+class Storage:
+    def __init__(self):
+        self._data: Dict[str, StorageItem] = {}
+        self._expire_heap = []
+
+Почему выбран:
+    Максимальная производительность операций чтения/записи
+    Простота реализации и тестирования
+    Полная совместимость с Redis-like операциями
+Отклоненные альтернативы:
+    SQLite: избыточность для in-memory решения, накладные расходы
+    Redis backend: нарушает принципы решения
+
+Протокол коммуникации
+Выбран: Упрощенный RESP + Inline команды
+
+class CommandParser:
+    def parse_command(self, data: str) -> List[str]:
+        return shlex.split(data)  # Inline парсинг
+
+Почему выбран:
+    Совместимость с Redis клиентами
+    Поддержка человеко-читаемого формата
+    Простота отладки через telnet
+
+Управление TTL
+Выбран: Heap + фоновая очистка
+
+async def _cleanup_expired_items(self):
+    while self._expire_heap and self._expire_heap[0][0] <= current_time:
+        expire_at, key = heapq.heappop(self._expire_heap)
+
+Почему выбран:
+    Эффективность O(log n) для операций TTL
+    Минимальная нагрузка на CPU
+    Точное время истечения
+
+Архитектура команд
+Выбран: Полиморфизм + автоматическая регистрация
+
+@register_command("SET")
+class SetCommand(Command):
+    def execute(self, args): pass
+
+Почему выбран:
+    Четкое разделение ответственности
+    Легкость добавления новых команд через декораторы
+    Автоматическая регистрация через CommandFactory
+
+Тестирование
+Выбран: pytest
+
+class TestStorage:
+    def test_set_get(self):
+        self.storage.set("key", "value")
+        found, value = self.storage.get("key")
+        assert found and value == "value"
+Почему выбран:
+    Хорошая интеграция с IDE
+    Параллельное выполнение тестов

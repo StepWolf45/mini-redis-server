@@ -1,0 +1,170 @@
+Расширяемость решения: Добавление новых команд
+
+Обзор архитектуры
+Mini Redis Server построен с учетом высокой расширяемости благодаря модульной архитектуре с автоматической регистрацией команд через декораторы и фабрику для инъекции зависимостей.
+
+Архитектурные компоненты
+1. Базовый класс Command и система регистрации
+Расположение: src/server/commands/base_abstraction.py
+
+class Command(ABC):
+    @abstractmethod
+    def execute(self, args: List[str]) -> Tuple[bool, Any]:
+        """Выполняет команду. Возвращает (успех, результат|ошибка)"""
+
+    @abstractmethod
+    def get_name(self) -> str:
+        """Имя команды"""
+
+    @staticmethod
+    def validate_args(args: List[str], min_args: int, max_args: int | None = None) -> bool:
+        """Проверяет количество аргументов"""
+
+# Автоматическая регистрация через декоратор
+def register_command(name: str):
+    def decorator(cls: Type[Command]) -> Type[Command]:
+        _command_registry[name.upper()] = cls
+        return cls
+    return decorator
+
+2. CommandFactory и CommandHandler
+Расположение: src/server/command_handler.py
+
+CommandFactory: создает экземпляры команд с инъекцией зависимостей
+CommandHandler: автоматически регистрирует все команды через систему декораторов
+
+3. Структура директорий
+text
+src/server/commands/
+├── __init__.py
+├── base_abstraction.py
+├── get.py
+├── set.py
+├── ttl.py
+└── [новая_команда].py
+
+
+Шаги добавления новой команды
+Шаг 1: Создание файла команды
+Создайте новый файл в src/server/commands/, например incr.py:
+
+from typing import List, Any, Tuple
+from .base_abstraction import Command, register_command
+
+@register_command("INCR")
+class IncrCommand(Command):
+    """Команда INCR для инкремента числового значения."""
+
+    def __init__(self, storage):
+        self.storage = storage
+
+    def execute(self, args: List[str]) -> Tuple[bool, Any]:
+        """
+        Выполняет команду INCR.
+
+        Синтаксис: INCR key
+
+        Args:
+            args: [key]
+
+        Returns:
+            Tuple[bool, Any]: (успех, новое значение)
+        """
+        if not self.validate_args(args, 1, 1):
+            return False, "ERR: wrong number of arguments for 'incr' command"
+
+        key = args[0]
+
+        # Получаем текущее значение
+        found, value = self.storage.get(key)
+        if not found:
+            new_value = 1
+        else:
+            try:
+                new_value = int(value) + 1
+            except (ValueError, TypeError):
+                return False, "ERR: value is not an integer"
+
+        # Сохраняем новое значение
+        success = self.storage.set(key, str(new_value))
+        if success:
+            return True, new_value
+        else:
+            return False, "ERR: failed to increment value"
+
+    def get_name(self) -> str:
+        return "INCR"
+
+Ключевые моменты:
+    Используйте декоратор @register_command("INCR") для автоматической регистрации
+    Команда автоматически будет создана через CommandFactory
+    Storage инжектируется автоматически
+
+Шаг 2: Автоматическая регистрация
+Никаких дополнительных действий не требуется! Команда автоматически регистрируется благодаря декоратору. CommandHandler автоматически подхватит ее через:
+
+def _register_defaults(self) -> None:
+    registry = get_registered_commands()  # Получает все зарегистрированные команды
+    self._commands = {
+        name: self._factory.create_command(command_cls)
+        for name, command_cls in registry.items()  # Автоматически для всех команд
+    }
+
+Шаг 3: Добавление тестов
+Создайте файл тестов tests/unit/test_incr_commands.py:
+
+import pytest
+from src.server.commands.incr import IncrCommand
+from src.server.storage import Storage
+
+class TestIncrCommand:
+    def setup_method(self):
+        self.storage = Storage()
+        self.command = IncrCommand(self.storage)
+
+    def test_incr_new_key(self):
+        """INCR на несуществующем ключе."""
+        success, result = self.command.execute(["counter"])
+        assert success is True
+        assert result == 1
+
+    def test_incr_existing_key(self):
+        """INCR на существующем ключе."""
+        self.storage.set("counter", "5")
+        success, result = self.command.execute(["counter"])
+        assert success is True
+        assert result == 6
+
+    def test_incr_invalid_value(self):
+        """INCR на ключе с нечисловым значением."""
+        self.storage.set("counter", "not_a_number")
+        success, result = self.command.execute(["counter"])
+        assert success is False
+        assert "not an integer" in result
+
+Шаг 4: Обновление документации
+Добавьте описание команды в docs/commands.md:
+
+markdown
+### INCR
+Инкрементирует числовое значение ключа.
+
+**Синтаксис:**
+INCR key
+
+text
+
+**Примеры:**
+INCR counter
+
+text
+
+**Ответ:**
+:6
+
+text
+(новое значение)
+
+**Ошибки:**
+-ERR wrong number of arguments for 'incr' command
+-ERR value is not an integer
